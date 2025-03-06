@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS user_music_preferences (
     user_id UUID REFERENCES users(user_id),
     genre VARCHAR(100),
     artist VARCHAR(100),
+    language VARCHAR(100),
     preference_weight DECIMAL(5, 2) DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

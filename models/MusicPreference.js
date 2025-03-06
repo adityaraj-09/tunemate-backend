@@ -11,13 +11,14 @@ class MusicPreference {
    * Get user's music preferences
    * 
    * @param {string} userId - User ID
-   * @returns {Promise<Object>} User's music preferences (genres and artists)
+   * @returns {Promise<Object>} User's music preferences (genres, artists, and languages)
    */
   static async getPreferences(userId) {
     const query = `
       SELECT 
         genre, 
-        artist, 
+        artist,
+        language,
         preference_weight
       FROM 
         user_music_preferences
@@ -29,9 +30,10 @@ class MusicPreference {
     
     const result = await db.query(query, [userId]);
     
-    // Organize into genres and artists
+    // Organize into genres, artists, and languages
     const genres = [];
     const artists = [];
+    const languages = [];
     
     result.rows.forEach(row => {
       if (row.genre) {
@@ -47,11 +49,19 @@ class MusicPreference {
           weight: parseFloat(row.preference_weight)
         });
       }
+      
+      if (row.language) {
+        languages.push({
+          name: row.language,
+          weight: parseFloat(row.preference_weight)
+        });
+      }
     });
     
     return {
       genres,
-      artists
+      artists,
+      languages
     };
   }
   
@@ -62,9 +72,10 @@ class MusicPreference {
    * @param {Object} preferences - Music preferences data
    * @param {Array<string>} [preferences.genres=[]] - Preferred music genres
    * @param {Array<string>} [preferences.artists=[]] - Preferred music artists
+   * @param {Array<string>} [preferences.languages=[]] - Preferred music languages
    * @returns {Promise<void>}
    */
-  static async updatePreferences(userId, { genres = [], artists = [] }) {
+  static async updatePreferences(userId, { genres = [], artists = [], languages = [] }) {
     // Start a transaction
     return db.transaction(async (client) => {
       // Store genre preferences
@@ -105,6 +116,26 @@ class MusicPreference {
         const preferenceId = uuidv4();
         // Higher weight (5) for explicitly selected artists
         await client.query(artistQuery, [preferenceId, userId, artist, 5]);
+      }
+      
+      // Store language preferences
+      for (const language of languages) {
+        if (!language) continue;
+        
+        const languageQuery = `
+          INSERT INTO user_music_preferences (
+            preference_id, user_id, language, preference_weight, created_at
+          )
+          VALUES ($1, $2, $3, $4, NOW())
+          ON CONFLICT (user_id, language)
+          DO UPDATE SET
+            preference_weight = GREATEST(user_music_preferences.preference_weight, $4),
+            updated_at = NOW()
+        `;
+        
+        const preferenceId = uuidv4();
+        // Higher weight (5) for explicitly selected languages
+        await client.query(languageQuery, [preferenceId, userId, language, 5]);
       }
     });
   }
@@ -190,6 +221,46 @@ class MusicPreference {
   }
   
   /**
+   * Increment preference weight for a language
+   * 
+   * @param {string} userId - User ID
+   * @param {string} language - Language name
+   * @param {number} [weight=1] - Weight to add
+   * @returns {Promise<Object>} Updated language preference
+   */
+  static async incrementLanguageWeight(userId, language, weight = 1) {
+    if (!language) return null;
+    
+    const query = `
+      INSERT INTO user_music_preferences (
+        preference_id, user_id, language, preference_weight, created_at
+      )
+      VALUES ($1, $2, $3, $4, NOW())
+      ON CONFLICT (user_id, language)
+      DO UPDATE SET
+        preference_weight = user_music_preferences.preference_weight + $4,
+        updated_at = NOW()
+      RETURNING preference_id, user_id, language, preference_weight, created_at, updated_at
+    `;
+    
+    const preferenceId = uuidv4();
+    const result = await db.query(query, [preferenceId, userId, language, weight]);
+    
+    if (result.rows.length === 0) {
+      return null;
+    }
+    
+    return {
+      id: result.rows[0].preference_id,
+      userId: result.rows[0].user_id,
+      language: result.rows[0].language,
+      weight: parseFloat(result.rows[0].preference_weight),
+      createdAt: result.rows[0].created_at,
+      updatedAt: result.rows[0].updated_at
+    };
+  }
+  
+  /**
    * Get top genres for a user
    * 
    * @param {string} userId - User ID
@@ -250,6 +321,36 @@ class MusicPreference {
   }
   
   /**
+   * Get top languages for a user
+   * 
+   * @param {string} userId - User ID
+   * @param {number} [limit=10] - Maximum number of languages to retrieve
+   * @returns {Promise<Array<Object>>} Top languages with weights
+   */
+  static async getTopLanguages(userId, limit = 10) {
+    const query = `
+      SELECT 
+        language, 
+        preference_weight
+      FROM 
+        user_music_preferences
+      WHERE 
+        user_id = $1 AND
+        language IS NOT NULL
+      ORDER BY 
+        preference_weight DESC
+      LIMIT $2
+    `;
+    
+    const result = await db.query(query, [userId, limit]);
+    
+    return result.rows.map(row => ({
+      name: row.language,
+      weight: parseFloat(row.preference_weight)
+    }));
+  }
+  
+  /**
    * Delete all preferences for a user
    * 
    * @param {string} userId - User ID
@@ -274,12 +375,13 @@ class MusicPreference {
    * @returns {Promise<Array<Object>>} Users with similar taste and similarity score
    */
   static async findSimilarUsers(userId, limit = 20) {
-    // This complex query calculates similarity based on shared genres and artists
+    // This complex query calculates similarity based on shared genres, artists, and languages
     const query = `
       WITH user_preferences AS (
         SELECT 
           genre,
           artist,
+          language,
           preference_weight
         FROM 
           user_music_preferences
@@ -333,6 +435,26 @@ class MusicPreference {
           ON ou.user_id = ump.user_id AND up.artist = ump.artist
         GROUP BY 
           ou.user_id
+      ),
+      language_similarity AS (
+        SELECT 
+          ou.user_id,
+          SUM(
+            CASE 
+              WHEN up.language IS NOT NULL AND up.language = ump.language 
+              THEN LEAST(up.preference_weight, ump.preference_weight)
+              ELSE 0
+            END
+          ) as language_score
+        FROM 
+          other_users ou
+        CROSS JOIN 
+          user_preferences up
+        LEFT JOIN 
+          user_music_preferences ump 
+          ON ou.user_id = ump.user_id AND up.language = ump.language
+        GROUP BY 
+          ou.user_id
       )
       SELECT 
         u.user_id,
@@ -340,15 +462,21 @@ class MusicPreference {
         u.first_name,
         u.last_name,
         u.profile_picture_url,
-        COALESCE(gs.genre_score, 0) * 0.4 + COALESCE(as.artist_score, 0) * 0.6 as similarity_score
+        COALESCE(gs.genre_score, 0) * 0.3 + 
+        COALESCE(as.artist_score, 0) * 0.5 + 
+        COALESCE(ls.language_score, 0) * 0.2 as similarity_score
       FROM 
         genre_similarity gs
       JOIN 
         artist_similarity as ON gs.user_id = as.user_id
       JOIN 
+        language_similarity ls ON gs.user_id = ls.user_id
+      JOIN 
         users u ON gs.user_id = u.user_id
       WHERE 
-        COALESCE(gs.genre_score, 0) > 0 OR COALESCE(as.artist_score, 0) > 0
+        COALESCE(gs.genre_score, 0) > 0 OR 
+        COALESCE(as.artist_score, 0) > 0 OR
+        COALESCE(ls.language_score, 0) > 0
       ORDER BY 
         similarity_score DESC
       LIMIT $2
@@ -364,6 +492,48 @@ class MusicPreference {
       profilePicture: row.profile_picture_url,
       similarityScore: parseFloat(row.similarity_score)
     }));
+  }
+  
+  /**
+   * Get music taste profile for a user
+   * 
+   * @param {string} userId - User ID
+   * @returns {Promise<Object>} Music taste profile including top genres, artists, and languages
+   */
+  static async getMusicTasteProfile(userId) {
+    // Get top preferences in each category
+    const [topGenres, topArtists, topLanguages] = await Promise.all([
+      MusicPreference.getTopGenres(userId, 5),
+      MusicPreference.getTopArtists(userId, 5),
+      MusicPreference.getTopLanguages(userId, 3)
+    ]);
+    
+    // Calculate total weights for percentage calculations
+    const totalGenreWeight = topGenres.reduce((sum, genre) => sum + genre.weight, 0);
+    const totalArtistWeight = topArtists.reduce((sum, artist) => sum + artist.weight, 0);
+    const totalLanguageWeight = topLanguages.reduce((sum, language) => sum + language.weight, 0);
+    
+    // Add percentage to each item
+    const genresWithPercentage = topGenres.map(genre => ({
+      ...genre,
+      percentage: totalGenreWeight > 0 ? Math.round((genre.weight / totalGenreWeight) * 100) : 0
+    }));
+    
+    const artistsWithPercentage = topArtists.map(artist => ({
+      ...artist,
+      percentage: totalArtistWeight > 0 ? Math.round((artist.weight / totalArtistWeight) * 100) : 0
+    }));
+    
+    const languagesWithPercentage = topLanguages.map(language => ({
+      ...language,
+      percentage: totalLanguageWeight > 0 ? Math.round((language.weight / totalLanguageWeight) * 100) : 0
+    }));
+    
+    return {
+      genres: genresWithPercentage,
+      artists: artistsWithPercentage,
+      languages: languagesWithPercentage
+    };
   }
 }
 
