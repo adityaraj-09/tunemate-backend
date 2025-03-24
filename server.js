@@ -202,5 +202,3 @@ if (process.env.RUN_WORKERS === 'true') {
   require('./workers/match-calculation.worker');
 }
 
-// Export for testing
-module.exports = { app, server, io };
