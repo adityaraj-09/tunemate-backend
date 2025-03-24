@@ -55,7 +55,8 @@ CREATE TABLE IF NOT EXISTS songs (
     release_year VARCHAR(4),
     language VARCHAR(50),
     copyright_text TEXT,
-    genre VARCHAR(50)
+    genre VARCHAR(50),
+    album_url VARCHAR(255)
 );
 
 -- Create user_music_history table
@@ -173,3 +174,15 @@ CREATE INDEX IF NOT EXISTS idx_matches_user_ids ON matches(user_id_1, user_id_2)
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+
+
+-- DO $$
+-- BEGIN
+--   IF NOT EXISTS (
+--     SELECT FROM information_schema.columns 
+--     WHERE table_name = 'songs' AND column_name = 'album_url'
+--   ) THEN
+--     ALTER TABLE songs ADD COLUMN album_url VARCHAR(255);
+--   END IF;
+-- END
+-- $$;

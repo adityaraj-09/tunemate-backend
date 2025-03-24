@@ -3,7 +3,10 @@ const { Worker } = require('bullmq');
 const { Pool } = require('pg');
 const { asyncRedis } = require('../config/redis');
 const { v4: uuidv4 } = require('uuid');
-
+const fs = require('fs');
+const path = require('path');
+const axios = require('axios');
+require('dotenv').config();
 // PostgreSQL connection
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
@@ -11,6 +14,10 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'musicapp',
   password: process.env.DB_PASSWORD || 'password',
   port: process.env.DB_PORT || 5432,
+  ssl: {
+    rejectUnauthorized: true,
+    ca: fs.readFileSync(path.resolve(__dirname, "./ca.pem")).toString(),
+  },
 });
 
 // Create worker to process match recalculations

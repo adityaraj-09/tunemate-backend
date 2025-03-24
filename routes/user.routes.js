@@ -10,7 +10,7 @@ const UserPreference = require('../models/UserPreference');
 const UserLocation = require('../models/UserLocation');
 const MusicHistory = require('../models/MusicHistory');
 const MusicPreference = require('../models/MusicPreference');
-
+const db = require('../config/database');
 // Set up multer for profile picture uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -251,6 +251,7 @@ router.get('/music/history', async (req, res) => {
     
     res.json({
       history,
+      success: true,
       pagination: {
         total,
         limit,
@@ -292,7 +293,7 @@ router.get('/music/favorites', async (req, res) => {
 router.post(
   '/music/favorite',
   [
-    check('songId', 'Song ID is required').not().isEmpty(),
+    check('song', 'Song is required').not().isEmpty(),
     check('isFavorite', 'Favorite status must be a boolean').isBoolean()
   ],
   async (req, res) => {
@@ -303,14 +304,66 @@ router.post(
     }
     
     try {
-      const { songId, isFavorite } = req.body;
+      const { song, isFavorite } = req.body;
+      const songCheck = await db.query('SELECT song_id FROM songs WHERE song_id = $1', [song.id]);
+    if (songCheck.rows.length === 0) {
+        // Fetch song data from Saavn API via our FastAPI service
+    let songData=song;
+  
+    // Store song in database if it doesn't exist or update if it does
+    const query = `
+      INSERT INTO songs (
+        song_id, song_name, album, primary_artists, singers, 
+        image_url, media_url, lyrics, duration, release_year, 
+        language, copyright_text, genre,album_url
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,$14)
+      ON CONFLICT (song_id) 
+      DO UPDATE SET
+        song_name = EXCLUDED.song_name,
+        album = EXCLUDED.album,
+        primary_artists = EXCLUDED.primary_artists,
+        singers = EXCLUDED.singers,
+        image_url = EXCLUDED.image_url,
+        media_url = EXCLUDED.media_url,
+        lyrics = EXCLUDED.lyrics,
+        duration = EXCLUDED.duration,
+        release_year = EXCLUDED.release_year,
+        language = EXCLUDED.language,
+        copyright_text = EXCLUDED.copyright_text,
+        genre = EXCLUDED.genre,
+        album_url=EXCLUDED.album_url
+        
+    `;
+    const values = [
+      songData.id,
+      songData.song,
+      songData.album,
+      songData.primary_artists,
+      songData.singers,
+      songData.image,
+      songData.media_url,
+      songData.lyrics,
+      songData.duration,
+      songData.year,
+      songData.language,
+      songData.copyright_text,
       
+      songData.genre || inferGenreFromArtists(songData.primary_artists) // Try to infer genre if not provided
+      ,songData.album_url ||"",
+    ];
+    
+    await db.query(query, values);
+    
+    console.log(`Stored song ${songData.id} in database`);
+    }
       // Toggle favorite status
-      const result = await MusicHistory.toggleFavorite(req.user.id, songId, isFavorite);
+      const result = await MusicHistory.toggleFavorite(req.user.id, song.id, isFavorite);
       
       res.json({
         message: isFavorite ? 'Song added to favorites' : 'Song removed from favorites',
-        songId,
+        success: true,
+        songId:song.id,
         isFavorite
       });
     } catch (error) {

@@ -3,6 +3,9 @@ const { Worker } = require('bullmq');
 const { Pool } = require('pg');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
+const path = require('path');
+require('dotenv').config();
 
 // PostgreSQL connection
 const pool = new Pool({
@@ -11,6 +14,10 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'musicapp',
   password: process.env.DB_PASSWORD || 'password',
   port: process.env.DB_PORT || 5432,
+  ssl: {
+    rejectUnauthorized: true,
+    ca: fs.readFileSync(path.resolve(__dirname, "./ca.pem")).toString(),
+  },
 });
 
 // FastAPI endpoint for retrieving song data from Saavn
@@ -18,7 +25,7 @@ const MUSIC_API_URL = process.env.MUSIC_API_URL || 'http://localhost:8000';
 
 // Create worker to process song data
 const songDataWorker = new Worker('song-data-queue', async (job) => {
-  const { songId, checkSimilar = false } = job.data;
+  const { songId, checkSimilar = false,song } = job.data;
   
   console.log(`Processing song data for ${songId}, checkSimilar: ${checkSimilar}`);
   
@@ -34,29 +41,19 @@ const songDataWorker = new Worker('song-data-queue', async (job) => {
         return { success: true, songId, exists: true };
       }
     }
+
     
     // Fetch song data from Saavn API via our FastAPI service
-    let songData;
-    try {
-      const songResponse = await axios.get(`${MUSIC_API_URL}/api/songs/${songId}`);
-      songData = songResponse.data;
-      
-      if (!songData) {
-        throw new Error(`Failed to get data for song ${songId}`);
-      }
-    } catch (error) {
-      console.error(`Error fetching song ${songId} from Saavn API:`, error);
-      throw new Error(`Failed to fetch song data from Saavn: ${error.message}`);
-    }
-    
+    let songData=song;
+  
     // Store song in database if it doesn't exist or update if it does
     const query = `
       INSERT INTO songs (
         song_id, song_name, album, primary_artists, singers, 
         image_url, media_url, lyrics, duration, release_year, 
-        language, copyright_text, genre
+        language, copyright_text, genre,album_url
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,$14)
       ON CONFLICT (song_id) 
       DO UPDATE SET
         song_name = EXCLUDED.song_name,
@@ -70,7 +67,9 @@ const songDataWorker = new Worker('song-data-queue', async (job) => {
         release_year = EXCLUDED.release_year,
         language = EXCLUDED.language,
         copyright_text = EXCLUDED.copyright_text,
-        genre = EXCLUDED.genre
+        genre = EXCLUDED.genre,
+        album_url=EXCLUDED.album_url
+        
     `;
     
     const values = [
@@ -86,7 +85,9 @@ const songDataWorker = new Worker('song-data-queue', async (job) => {
       songData.year,
       songData.language,
       songData.copyright_text,
+      
       songData.genre || inferGenreFromArtists(songData.primary_artists) // Try to infer genre if not provided
+      ,songData.album_url ||"",
     ];
     
     await pool.query(query, values);

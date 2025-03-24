@@ -39,6 +39,8 @@ class MusicHistory {
     
     return this.formatHistory(result.rows[0]);
   }
+
+
   
   /**
    * Get user's listening history
@@ -54,7 +56,7 @@ class MusicHistory {
       SELECT 
         umh.history_id, umh.user_id, umh.song_id, 
         umh.play_count, umh.last_played, umh.is_favorite,
-        s.song_name, s.album, s.primary_artists, s.image_url, s.media_url
+        s.song_name, s.album, s.primary_artists, s.image_url, s.media_url,s.album_url
       FROM 
         user_music_history umh
       JOIN 
@@ -76,7 +78,8 @@ class MusicHistory {
         album: row.album,
         artists: row.primary_artists,
         imageUrl: row.image_url,
-        mediaUrl: row.media_url
+        mediaUrl: row.media_url,
+        album_url: row.album_url
       }
     }));
   }

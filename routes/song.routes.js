@@ -4,17 +4,20 @@ const router = express.Router();
 const { check, validationResult } = require('express-validator');
 const Song = require('../models/Song');
 const MusicHistory = require('../models/MusicHistory');
-const { listenQueue } = require('../config/queue');
+const { listenQueue, songDataQueue } = require('../config/queue');
 const { publish, CHANNELS } = require('../config/redis');
-
+const axios = require('axios');
 /**
  * @route   GET /api/songs/:songId
  * @desc    Get song details
  * @access  Public
  */
-router.get('/:songId', async (req, res) => {
+router.get('get/:songId', async (req, res) => {
   try {
     const songId = req.params.songId;
+
+    console.log('Fetching song:', songId);
+
     
     // Get song from database
     let song = await Song.findById(songId);
@@ -87,7 +90,7 @@ router.get('/similar/:songId', async (req, res) => {
 router.post(
   '/listen',
   [
-    check('songId', 'Song ID is required').not().isEmpty(),
+    check('song', 'song').not().isEmpty(),
     check('duration', 'Duration must be a number').optional().isNumeric()
   ],
   async (req, res) => {
@@ -103,12 +106,12 @@ router.post(
     }
     
     try {
-      const { songId, duration = 0 } = req.body;
+      const { song, duration = 0 } = req.body;
       
       // Add listen event to queue for processing
       await listenQueue.add(
         'process-listen',
-        { userId: req.user.id, songId, duration },
+        { userId: req.user.id, song, duration },
         { 
           removeOnComplete: true,
           attempts: 3,
@@ -119,15 +122,15 @@ router.post(
         }
       );
       
-      // Publish event for real-time subscribers
-      await publish(CHANNELS.SONG_LISTEN, {
-        userId: req.user.id,
-        songId,
-        timestamp: new Date().toISOString()
-      });
+      // // Publish event for real-time subscribers
+      // await publish(CHANNELS.SONG_LISTEN, {
+      //   userId: req.user.id,
+      //   songId,
+      //   timestamp: new Date().toISOString()
+      // });
       
-      // Record the listen synchronously if needed for immediate feedback
-      await MusicHistory.recordListen(req.user.id, songId, duration);
+      // // Record the listen synchronously if needed for immediate feedback
+      // await MusicHistory.recordListen(req.user.id, songId, duration);
       
       res.json({ success: true, message: 'Listen event recorded' });
     } catch (error) {
@@ -145,7 +148,7 @@ router.post(
 router.get('/search', async (req, res) => {
   try {
     const query = req.query.q;
-    const limit = parseInt(req.query.limit) || 20;
+    const limit = parseInt(req.query.limit) || 1;
     
     if (!query) {
       return res.status(400).json({ error: 'Search query is required' });
@@ -154,23 +157,24 @@ router.get('/search', async (req, res) => {
     // Search for songs in our database
     const songs = await Song.search(query, limit);
     
+    console.log('Database search results:', songs.length);
     // If we have enough results, return them
     if (songs.length >= Math.floor(limit / 2)) {
-      return res.json({ songs });
+      return res.json({ songs,success:true });
     }
     
     // Otherwise, try to search via Saavn API
     try {
-      const MUSIC_API_URL = process.env.MUSIC_API_URL || 'http://localhost:8000';
-      const response = await axios.get(`${MUSIC_API_URL}/song?query=${encodeURIComponent(query)}&lyrics=${false}&songData=${true}`);
-      
-      if (response.data && response.data.songs) {
+      const MUSIC_API_URL =  'http://127.0.0.1:8000';
+      const response = await axios.get(`${MUSIC_API_URL}/song?query=${encodeURIComponent(query)}&lyrics=${true}&songdata=${true}`);
+      console.log('Saavn API response:', response.data);
+      if (response.data) {
         // Process and store the songs in the background
-        for (const song of response.data.songs) {
+        for (const song of response.data) {
           // Queue song data processing
           await songDataQueue.add(
             'process-song',
-            { songId: song.id, checkSimilar: false },
+            { songId: song.id, checkSimilar: false,song:song },
             { 
               removeOnComplete: true,
               attempts: 3,
@@ -182,7 +186,7 @@ router.get('/search', async (req, res) => {
           );
         }
         
-        return res.json({ songs: response.data.songs });
+        return res.json({ songs: response.data,success:true });
       }
     } catch (error) {
       console.error('Error searching via Saavn API:', error);
@@ -190,10 +194,10 @@ router.get('/search', async (req, res) => {
     }
     
     // Return whatever results we have from our database
-    res.json({ songs });
+    res.json({ songs,success:true });
   } catch (error) {
     console.error('Error searching songs:', error);
-    res.status(500).json({ error: 'Server error searching songs' });
+    res.status(500).json({ error: 'Server error searching songs',success:false });
   }
 });
 
@@ -230,7 +234,7 @@ router.get('/trending', async (req, res) => {
     const songs = await Song.getPopular(limit);
     
     // If we have enough songs, return them
-    if (songs.length >= Math.floor(limit / 2)) {
+    if (songs.length >0) {
       return res.json({ songs });
     }
 

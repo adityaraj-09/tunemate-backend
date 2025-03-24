@@ -1,7 +1,7 @@
 // config/jwt.js
 const jwt = require('jsonwebtoken');
 const { asyncRedis } = require('./redis');
-const redis = require('./redis');
+
 
 // JWT configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';

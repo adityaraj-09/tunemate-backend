@@ -116,7 +116,7 @@ class Song {
       SELECT 
         s.song_id, s.song_name, s.album, s.primary_artists, 
         s.image_url, s.media_url, s.duration, s.release_year, 
-        s.language, s.genre,
+        s.language, s.genre,s.album_url,
         COUNT(DISTINCT umh.user_id) AS listener_count
       FROM 
         songs s
@@ -127,7 +127,9 @@ class Song {
     // Add exclusion if needed
     const params = [];
     if (excludeSongIds.length > 0) {
-      query += ` WHERE s.song_id NOT IN (${excludeSongIds.map((_, i) => `${i + 1}`).join(',')})`;
+      // Create the correct number of placeholders ($1, $2, etc.)
+      const placeholders = excludeSongIds.map((_, i) => `$${i + 1}`).join(',');
+      query += ` WHERE s.song_id NOT IN (${placeholders})`;
       params.push(...excludeSongIds);
     }
     
@@ -135,10 +137,10 @@ class Song {
       GROUP BY 
         s.song_id, s.song_name, s.album, s.primary_artists, 
         s.image_url, s.media_url, s.duration, s.release_year, 
-        s.language, s.genre
+        s.language, s.genre,s.album_url
       ORDER BY 
         listener_count DESC, s.song_name
-      LIMIT ${params.length + 1}
+      LIMIT $${params.length + 1}
     `;
     
     params.push(limit);
@@ -324,6 +326,7 @@ class Song {
       language: song.language,
       copyright: song.copyright_text,
       genre: song.genre,
+      album_url:song.album_url,
       listenerCount: song.listener_count ? parseInt(song.listener_count) : undefined
     };
   }

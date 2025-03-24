@@ -5,7 +5,8 @@ const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const { asyncRedis } = require('../config/redis');
 const { songDataQueue, matchCalculationQueue } = require('../config/queue');
-
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 // PostgreSQL connection
 const pool = new Pool({
@@ -14,36 +15,71 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'musicapp',
   password: process.env.DB_PASSWORD || 'password',
   port: process.env.DB_PORT || 5432,
+  ssl: {
+    rejectUnauthorized: true,
+    ca: fs.readFileSync(path.resolve(__dirname, "./ca.pem")).toString(),
+  },
 });
 
 // Create worker to process song listen events
 const listenWorker = new Worker('song-listen-queue', async (job) => {
-  const { userId, songId, duration = 0 } = job.data;
+  const { userId, song, duration = 0 } = job.data;
   
-  console.log(`Processing listen event: User ${userId} listened to song ${songId} for ${duration}s`);
+  console.log(`Processing listen event: User ${userId} listened to song ${song} for ${duration}s`);
   
   try {
-    // Check if song exists in our database, if not add it to the song data queue
-    const songCheck = await pool.query('SELECT song_id FROM songs WHERE song_id = $1', [songId]);
-    
+    const songCheck = await pool.query('SELECT song_id FROM songs WHERE song_id = $1', [song]);
     if (songCheck.rows.length === 0) {
-      console.log(`Song ${songId} not found in database, queueing for processing`);
+        // Fetch song data from Saavn API via our FastAPI service
+    let songData=song;
+  
+    // Store song in database if it doesn't exist or update if it does
+    const query = `
+      INSERT INTO songs (
+        song_id, song_name, album, primary_artists, singers, 
+        image_url, media_url, lyrics, duration, release_year, 
+        language, copyright_text, genre,album_url
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,$14)
+      ON CONFLICT (song_id) 
+      DO UPDATE SET
+        song_name = EXCLUDED.song_name,
+        album = EXCLUDED.album,
+        primary_artists = EXCLUDED.primary_artists,
+        singers = EXCLUDED.singers,
+        image_url = EXCLUDED.image_url,
+        media_url = EXCLUDED.media_url,
+        lyrics = EXCLUDED.lyrics,
+        duration = EXCLUDED.duration,
+        release_year = EXCLUDED.release_year,
+        language = EXCLUDED.language,
+        copyright_text = EXCLUDED.copyright_text,
+        genre = EXCLUDED.genre,
+        album_url=EXCLUDED.album_url
+        
+    `;
+    const values = [
+      songData.id,
+      songData.song,
+      songData.album,
+      songData.primary_artists,
+      songData.singers,
+      songData.image,
+      songData.media_url,
+      songData.lyrics,
+      songData.duration,
+      songData.year,
+      songData.language,
+      songData.copyright_text,
       
-      // Queue song for processing and retrieving from Saavn
-      await songDataQueue.add(
-        'process-song',
-        { songId, checkSimilar: true },
-        { 
-          removeOnComplete: true,
-          attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 1000
-          }
-        }
-      );
-    }
+      songData.genre || inferGenreFromArtists(songData.primary_artists) // Try to infer genre if not provided
+      ,songData.album_url ||"",
+    ];
     
+    await pool.query(query, values);
+    
+    console.log(`Stored song ${songData.id} in database`);
+    }
     // Record listen event in database
     await pool.query(
       `INSERT INTO user_music_history (
@@ -56,25 +92,25 @@ const listenWorker = new Worker('song-listen-queue', async (job) => {
        DO UPDATE SET
          play_count = user_music_history.play_count + 1,
          last_played = NOW()`,
-      [uuidv4(), userId, songId]
+      [uuidv4(), userId, song.id]
     );
     
-    console.log(`Recorded listen event for user ${userId}, song ${songId}`);
+    console.log(`Recorded listen event for user ${userId}, song ${song.id}`);
     
     // Update user's music profile (artist and genre preferences)
-    await updateUserMusicProfile(userId, songId, duration);
+    await updateUserMusicProfile(userId, song.id, duration);
     
-    // Queue match recalculation
-    await queueMatchRecalculation(userId);
+    // // Queue match recalculation
+    // await queueMatchRecalculation(userId);
     
     // Invalidate recommendation caches
-    await asyncRedis.del(`recommendations:songs:${userId}`);
-    await asyncRedis.del(`recommendations:users:${userId}`);
+    // await asyncRedis.del(`recommendations:songs:${userId}`);
+    // await asyncRedis.del(`recommendations:users:${userId}`);
     
-    return { success: true, userId, songId };
+    return { success: true, userId, songId:song.id };
     
   } catch (error) {
-    console.error(`Error processing listen event for user ${userId}, song ${songId}:`, error);
+    console.error(`Error processing listen event for user ${userId}, song ${song.id}:`, error);
     throw error;
   }
 }, {
@@ -83,7 +119,33 @@ const listenWorker = new Worker('song-listen-queue', async (job) => {
   },
   concurrency: 10 // Process 10 listen events at a time
 });
-
+function inferGenreFromArtists(artistsString) {
+  if (!artistsString) return null;
+  
+  const artists = artistsString.toLowerCase();
+  
+  // Very simplistic genre inference - in a real app, you'd use a more sophisticated approach
+  const genreKeywords = {
+    'rock': ['rock', 'metal', 'band', 'guitarist'],
+    'pop': ['pop', 'boy band', 'girl band'],
+    'hip hop': ['rap', 'hip hop', 'rapper', 'mc'],
+    'r&b': ['r&b', 'rnb', 'soul'],
+    'electronic': ['dj', 'electronic', 'edm', 'house', 'techno'],
+    'classical': ['orchestra', 'classical', 'symphony'],
+    'jazz': ['jazz', 'blues', 'saxophone'],
+    'country': ['country', 'western']
+  };
+  
+  for (const [genre, keywords] of Object.entries(genreKeywords)) {
+    for (const keyword of keywords) {
+      if (artists.includes(keyword)) {
+        return genre;
+      }
+    }
+  }
+  
+  return null; // No genre match
+}
 // Update user's music profile based on listening
 async function updateUserMusicProfile(userId, songId, duration) {
   try {

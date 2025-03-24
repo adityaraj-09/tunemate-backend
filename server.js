@@ -88,8 +88,9 @@ app.use('/api/chats', authenticateToken, chatRoutes);
 app.use('/api/saavn', createProxyMiddleware({
   target: process.env.MUSIC_API_URL || 'http://localhost:8000',
   changeOrigin: true,
+  followRedirects: true,
   pathRewrite: {
-    '^/api/saavn': '/api' // Rewrite path
+    '^/api/saavn': '' // Rewrite path
   },
   onProxyReq: (proxyReq, req, res) => {
     // Forward auth header if available
@@ -175,6 +176,15 @@ initializeDatabase()
 // Handle graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
+});
+
+// For handling Ctrl+C in terminal
+process.on('SIGINT', () => {
+  console.log('SIGINT signal received: closing HTTP server');
   server.close(() => {
     console.log('HTTP server closed');
     process.exit(0);
