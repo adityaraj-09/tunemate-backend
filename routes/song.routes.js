@@ -7,6 +7,7 @@ const MusicHistory = require('../models/MusicHistory');
 const { listenQueue, songDataQueue } = require('../config/queue');
 const { publish, CHANNELS } = require('../config/redis');
 const axios = require('axios');
+require('dotenv').config();
 /**
  * @route   GET /api/songs/:songId
  * @desc    Get song details
@@ -165,8 +166,8 @@ router.get('/search', async (req, res) => {
     
     // Otherwise, try to search via Saavn API
     try {
-      const MUSIC_API_URL =  'http://127.0.0.1:8000';
-      const response = await axios.get(`${MUSIC_API_URL}/song?query=${encodeURIComponent(query)}&lyrics=${true}&songdata=${true}`);
+    
+      const response = await axios.get(`${process.env.MUSIC_API_URL}/song?query=${encodeURIComponent(query)}&lyrics=${true}&songdata=${true}`);
       console.log('Saavn API response:', response.data);
       if (response.data) {
         // Process and store the songs in the background
