@@ -91,6 +91,7 @@ app.use('/api/chats', authenticateToken, chatRoutes);
 // Proxy to FastAPI Music Service
 app.use('/api/saavn', createProxyMiddleware({
   target: process.env.MUSIC_API_URL || 'http://localhost:8000',
+  timeout: 10000,
   changeOrigin: true,
   followRedirects: true,
   pathRewrite: {
