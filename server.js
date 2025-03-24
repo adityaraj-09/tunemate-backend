@@ -45,11 +45,11 @@ const io = socketIo(server, {
 app.use(helmet()); // Security headers
 
 // Create a write stream for logs
-const logStream = fs.createWriteStream(path.join(__dirname, 'access.log'), { flags: 'a' });
+// const logStream = fs.createWriteStream(path.join(__dirname, 'access.log'), { flags: 'a' });
 
-// Use both file and console logging
-app.use(morgan('combined', { stream: logStream }));
-app.use(morgan('dev')); // Keep console logging for development
+// // Use both file and console logging
+// app.use(morgan('combined', { stream: logStream }));
+// app.use(morgan('dev')); // Keep console logging for development
 
 
 app.use(cors({
