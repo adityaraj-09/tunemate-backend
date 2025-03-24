@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-// const { createProxyMiddleware } = require('http-proxy-middleware');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 const http = require('http');
 const socketIo = require('socket.io');
 const rateLimit = require('express-rate-limit');
@@ -88,21 +88,21 @@ app.use('/api/matches', authenticateToken, matchRoutes);
 app.use('/api/recommendations', authenticateToken, recommendationRoutes);
 app.use('/api/chats', authenticateToken, chatRoutes);
 
-// // Proxy to FastAPI Music Service
-// app.use('/api/saavn', createProxyMiddleware({
-//   target: process.env.MUSIC_API_URL || 'http://localhost:8000',
-//   changeOrigin: true,
-//   followRedirects: true,
-//   pathRewrite: {
-//     '^/api/saavn': '' // Rewrite path
-//   },
-//   onProxyReq: (proxyReq, req, res) => {
-//     // Forward auth header if available
-//     if (req.headers.authorization) {
-//       proxyReq.setHeader('Authorization', req.headers.authorization);
-//     }
-//   }
-// }));
+// Proxy to FastAPI Music Service
+app.use('/api/saavn', createProxyMiddleware({
+  target: process.env.MUSIC_API_URL || 'http://localhost:8000',
+  changeOrigin: true,
+  followRedirects: true,
+  pathRewrite: {
+    '^/api/saavn': '' // Rewrite path
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    // Forward auth header if available
+    if (req.headers.authorization) {
+      proxyReq.setHeader('Authorization', req.headers.authorization);
+    }
+  }
+}));
 
 // Socket.IO authentication middleware
 io.use(async (socket, next) => {
