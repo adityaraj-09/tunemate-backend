@@ -76,6 +76,10 @@ app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+app.get("/",(req,res)=>{
+  res.send("Hello World");
+})
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', authenticateToken, userRoutes);
