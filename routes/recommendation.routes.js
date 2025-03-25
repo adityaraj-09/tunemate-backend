@@ -8,6 +8,8 @@ const MusicPreference = require('../models/MusicPreference');
 const User = require('../models/User');
 const Match = require('../models/Match');
 const { songDataQueue } = require('../config/queue');
+const UserLocation = require('../models/UserLocation');
+const UserPreference = require('../models/UserPreference');
 
 /**
  * @route   GET /api/recommendations/songs

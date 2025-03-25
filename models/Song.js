@@ -208,7 +208,7 @@ class Song {
 SELECT
   s.song_id, s.song_name, s.album, s.primary_artists,
   s.image_url, s.media_url, s.duration, s.release_year,
-  s.language, s.genre,
+  s.language, s.genre,s.album_url,
   -- Language match (highest priority)
   CASE
     WHEN s.language = si.language AND si.language IS NOT NULL THEN 12
