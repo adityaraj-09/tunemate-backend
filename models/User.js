@@ -304,6 +304,7 @@ static async authenticateWithIdentifier(identifier, password) {
   const result = await db.query(query, [identifier]);
   
   if (result.rows.length === 0) {
+    console.log('User not found');
     return null;
   }
   
@@ -313,6 +314,7 @@ static async authenticateWithIdentifier(identifier, password) {
   const isPasswordValid = await bcrypt.compare(password, user.password_hash);
   
   if (!isPasswordValid) {
+    console.log('Invalid password');
     return null;
   }
   

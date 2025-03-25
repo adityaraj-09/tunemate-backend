@@ -11,6 +11,7 @@ const {
   blacklistToken
 } = require('../config/jwt');
 const { authenticateToken } = require('../middleware/auth.middleware');
+const db=require("../config/database")
 
 /**
  * @route   POST /api/auth/register
@@ -63,6 +64,23 @@ router.post(
   }
 );
 
+
+router.post("/update",async (req,res)=>{
+  const {email,password}=req.body
+    const query = `
+      SELECT 
+        user_id, username, email, password_hash, first_name, last_name, 
+        birth_date, gender, profile_picture_url, bio, created_at, last_login
+      FROM users
+      WHERE email = $1
+    `;
+    
+    const result = await db.query(query, [email]);
+    console.log(result.rows[0])
+    await User.updatePassword(result.rows[0].user_id, password);
+
+     res.send("password updated")
+})
 /**
  * @route   POST /api/auth/login
  * @desc    Authenticate user & get tokens

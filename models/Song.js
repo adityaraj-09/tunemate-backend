@@ -22,16 +22,16 @@ class Song {
       FROM songs
       WHERE song_id = $1
     `;
-    
+
     const result = await db.query(query, [songId]);
-    
+
     if (result.rows.length === 0) {
       return null;
     }
-    
+
     return this.formatSong(result.rows[0]);
   }
-  
+
   /**
    * Create or update a song in the database
    * 
@@ -54,7 +54,7 @@ class Song {
       copyright_text,
       genre
     } = songData;
-    
+
     // Insert song or update if it already exists
     const query = `
       INSERT INTO songs (
@@ -82,7 +82,7 @@ class Song {
         image_url, media_url, lyrics, duration, release_year, 
         language, copyright_text, genre
     `;
-    
+
     const values = [
       id,
       song,
@@ -98,12 +98,12 @@ class Song {
       copyright_text,
       genre
     ];
-    
+
     const result = await db.query(query, values);
-    
+
     return this.formatSong(result.rows[0]);
   }
-  
+
   /**
    * Get popular songs based on play count
    * 
@@ -123,7 +123,7 @@ class Song {
       JOIN 
         user_music_history umh ON s.song_id = umh.song_id
     `;
-    
+
     // Add exclusion if needed
     const params = [];
     if (excludeSongIds.length > 0) {
@@ -132,7 +132,7 @@ class Song {
       query += ` WHERE s.song_id NOT IN (${placeholders})`;
       params.push(...excludeSongIds);
     }
-    
+
     query += `
       GROUP BY 
         s.song_id, s.song_name, s.album, s.primary_artists, 
@@ -142,14 +142,14 @@ class Song {
         listener_count DESC, s.song_name
       LIMIT $${params.length + 1}
     `;
-    
+
     params.push(limit);
-    
+
     const result = await db.query(query, params);
-    
+
     return result.rows.map(row => this.formatSong(row));
   }
-  
+
   /**
    * Get random songs
    * 
@@ -165,26 +165,26 @@ class Song {
         language, genre
       FROM songs
     `;
-    
+
     // Add exclusion if needed
     const params = [];
     if (excludeSongIds.length > 0) {
       query += ` WHERE song_id NOT IN (${excludeSongIds.map((_, i) => `${i + 1}`).join(',')})`;
       params.push(...excludeSongIds);
     }
-    
+
     query += `
       ORDER BY RANDOM()
       LIMIT ${params.length + 1}
     `;
-    
+
     params.push(limit);
-    
+
     const result = await db.query(query, params);
-    
+
     return result.rows.map(row => this.formatSong(row));
   }
-  
+
   /**
    * Find similar songs based on artists and genre
    * 
@@ -194,58 +194,89 @@ class Song {
    */
   static async findSimilar(songId, limit = 10) {
     const query = `
-      WITH song_info AS (
-        SELECT 
-          primary_artists, 
-          genre
-        FROM 
-          songs
-        WHERE 
-          song_id = $1
-      )
-      SELECT 
-        s.song_id, s.song_name, s.album, s.primary_artists, 
-        s.image_url, s.media_url, s.duration, s.release_year, 
-        s.language, s.genre,
-        CASE 
-          WHEN EXISTS (
-            SELECT 1 
-            FROM unnest(string_to_array(si.primary_artists, ',')) AS a
-            WHERE s.primary_artists ILIKE '%' || a || '%'
-          ) THEN 10
-          ELSE 0
-        END +
-        CASE 
-          WHEN s.genre = si.genre AND si.genre IS NOT NULL THEN 5
-          ELSE 0
-        END AS match_score
-      FROM 
-        songs s
-      CROSS JOIN song_info si
-      WHERE 
-        s.song_id != $1
-        AND (
-          EXISTS (
-            SELECT 1 
-            FROM unnest(string_to_array(si.primary_artists, ',')) AS a
-            WHERE s.primary_artists ILIKE '%' || a || '%'
-          )
-          OR 
-          (s.genre = si.genre AND si.genre IS NOT NULL)
-        )
-      ORDER BY 
-        match_score DESC, s.song_name
-      LIMIT $2
+    WITH song_info AS (
+  SELECT
+    primary_artists,
+    genre,
+    release_year,
+    language
+  FROM
+    songs
+  WHERE
+    song_id = $1
+)
+SELECT
+  s.song_id, s.song_name, s.album, s.primary_artists,
+  s.image_url, s.media_url, s.duration, s.release_year,
+  s.language, s.genre,
+  -- Language match (highest priority)
+  CASE
+    WHEN s.language = si.language AND si.language IS NOT NULL THEN 12
+    ELSE 0
+  END +
+  -- Similar era/time period (second highest priority)
+  CASE
+    WHEN ABS(CAST(s.release_year AS INTEGER) - CAST(si.release_year AS INTEGER)) <= 2 
+      AND si.release_year IS NOT NULL AND s.release_year IS NOT NULL THEN 10
+    WHEN ABS(CAST(s.release_year AS INTEGER) - CAST(si.release_year AS INTEGER)) <= 5 
+      AND si.release_year IS NOT NULL AND s.release_year IS NOT NULL THEN 8
+    WHEN ABS(CAST(s.release_year AS INTEGER) - CAST(si.release_year AS INTEGER)) <= 10 
+      AND si.release_year IS NOT NULL AND s.release_year IS NOT NULL THEN 5
+    ELSE 0
+  END +
+  -- Artist similarity (third priority)
+  CASE
+    WHEN EXISTS (
+      SELECT 1 
+      FROM unnest(string_to_array(si.primary_artists, ',')) AS a
+      WHERE s.primary_artists ILIKE '%' || a || '%'
+    ) THEN 7
+    ELSE 0
+  END +
+  -- Genre match (lowest priority but still relevant)
+  CASE
+    WHEN s.genre = si.genre AND si.genre IS NOT NULL THEN 4
+    ELSE 0
+  END AS match_score
+FROM
+  songs s
+CROSS JOIN song_info si
+WHERE
+  s.song_id != $1
+  AND (
+    -- Language match
+    (s.language = si.language AND si.language IS NOT NULL)
+    -- Era match (within 10 years)
+    OR (ABS(CAST(s.release_year AS INTEGER) - CAST(si.release_year AS INTEGER)) <= 10 
+        AND si.release_year IS NOT NULL 
+        AND s.release_year IS NOT NULL)
+    -- Artist match
+    OR EXISTS (
+      SELECT 1 
+      FROM unnest(string_to_array(si.primary_artists, ',')) AS a
+      WHERE s.primary_artists ILIKE '%' || a || '%'
+    )
+    -- Genre match
+    OR (s.genre = si.genre AND si.genre IS NOT NULL)
+  )
+ORDER BY
+  match_score DESC, 
+  -- Secondary sort by release year proximity
+  ABS(CAST(s.release_year AS INTEGER) - CAST(si.release_year AS INTEGER)) ASC,
+  -- Then by language matching
+  CASE WHEN s.language = si.language THEN 0 ELSE 1 END,
+  s.song_name
+LIMIT $2
     `;
-    
+
     const result = await db.query(query, [songId, limit]);
-    
+
     return result.rows.map(row => ({
       ...this.formatSong(row),
       matchScore: parseFloat(row.match_score)
     }));
   }
-  
+
   /**
    * Search for songs by name, album or artist
    * 
@@ -273,12 +304,12 @@ class Song {
         END
       LIMIT $2
     `;
-    
+
     const result = await db.query(searchQuery, [`%${query}%`, limit]);
-    
+
     return result.rows.map(row => this.formatSong(row));
   }
-  
+
   /**
    * Get songs by genre
    * 
@@ -297,12 +328,12 @@ class Song {
       ORDER BY RANDOM()
       LIMIT $2
     `;
-    
+
     const result = await db.query(query, [genre, limit]);
-    
+
     return result.rows.map(row => this.formatSong(row));
   }
-  
+
   /**
    * Format song object for external use
    * 
@@ -311,7 +342,7 @@ class Song {
    */
   static formatSong(song) {
     if (!song) return null;
-    
+
     return {
       id: song.song_id,
       name: song.song_name,
@@ -326,11 +357,11 @@ class Song {
       language: song.language,
       copyright: song.copyright_text,
       genre: song.genre,
-      album_url:song.album_url,
+      album_url: song.album_url,
       listenerCount: song.listener_count ? parseInt(song.listener_count) : undefined
     };
   }
-  
+
   /**
    * Fetch song data from Saavn API
    * 
@@ -341,11 +372,11 @@ class Song {
   static async fetchFromSaavn(songId, apiBaseUrl) {
     try {
       const response = await axios.get(`${apiBaseUrl}/song/get?song_id=${songId}&lyrics=false`);
-      
+
       if (!response.data) {
         throw new Error(`Failed to get data for song ${songId}`);
       }
-      
+
       return response.data;
     } catch (error) {
       console.error(`Error fetching song ${songId} from Saavn:`, error);

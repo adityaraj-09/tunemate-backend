@@ -31,7 +31,7 @@ const chatRoutes = require('./routes/chat.routes');
 // Create Express app
 const app = express();
 const server = http.createServer(app);
-
+app.set('trust proxy', true); // Trust X-Forwarded-For header
 // Socket.IO setup
 const io = socketIo(server, {
   cors: {
@@ -94,6 +94,7 @@ app.use('/api/saavn', createProxyMiddleware({
   timeout: 10000,
   changeOrigin: true,
   followRedirects: true,
+  
   pathRewrite: {
     '^/api/saavn': '' // Rewrite path
   },

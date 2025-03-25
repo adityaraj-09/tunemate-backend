@@ -432,6 +432,7 @@ router.get('/music/preferences', async (req, res) => {
   }
 });
 
+
 /**
  * @route   PUT /api/users/password
  * @desc    Update user password
