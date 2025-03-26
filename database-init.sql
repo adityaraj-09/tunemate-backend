@@ -14,7 +14,42 @@ CREATE TABLE IF NOT EXISTS users (
     last_login TIMESTAMP
 );
 
--- Create user_locations table
+-- Playlists table
+CREATE TABLE IF NOT EXISTS playlists (
+    playlist_id UUID PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    image_url VARCHAR(255),
+    created_by UUID REFERENCES users(user_id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create a playlist_songs junction table for many-to-many relationship
+CREATE TABLE IF NOT EXISTS playlist_songs (
+    playlist_id UUID REFERENCES playlists(playlist_id) ON DELETE CASCADE,
+    song_id VARCHAR(36) NOT NULL, -- Assuming this is your song ID format
+    position INTEGER NOT NULL, -- For maintaining song order in playlist
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (playlist_id, song_id)
+);
+
+-- Create indexes for efficient lookups
+CREATE INDEX IF NOT EXISTS idx_playlists_created_by ON playlists(created_by);
+CREATE INDEX IF NOT EXISTS idx_playlist_songs_song_id ON playlist_songs(song_id);
+CREATE INDEX IF NOT EXISTS idx_playlist_songs_position ON playlist_songs(playlist_id, position);
+
+-- Add trigger to update the updated_at timestamp automatically
+CREATE OR REPLACE FUNCTION update_timestamp_column()
+RETURNS TRIGGER AS $$
+BEGIN
+   NEW.updated_at = CURRENT_TIMESTAMP;
+   RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+
+
 CREATE TABLE IF NOT EXISTS user_locations (
     location_id UUID PRIMARY KEY,
     user_id UUID REFERENCES users(user_id),
