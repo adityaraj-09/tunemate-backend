@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { check, validationResult } = require('express-validator');
-const Playlist = require('../models/Playlist');
+const Playlist = require('../models/playlist');
 const { authenticateToken } = require('../middleware/auth.middleware');
 
 /**
