@@ -289,7 +289,7 @@ LIMIT $2
       SELECT 
         song_id, song_name, album, primary_artists, singers, 
         image_url, media_url, duration, release_year, 
-        language, genre,album_url
+        language, genre,album_url,lyrics
       FROM songs
       WHERE 
         song_name ILIKE $1 OR

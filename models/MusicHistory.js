@@ -56,7 +56,7 @@ class MusicHistory {
       SELECT 
         umh.history_id, umh.user_id, umh.song_id, 
         umh.play_count, umh.last_played, umh.is_favorite,
-        s.song_name, s.album, s.primary_artists, s.image_url, s.media_url,s.album_url
+        s.song_name, s.album, s.primary_artists, s.image_url, s.media_url,s.album_url,s.lyrics
       FROM 
         user_music_history umh
       JOIN 
@@ -79,7 +79,8 @@ class MusicHistory {
         artists: row.primary_artists,
         imageUrl: row.image_url,
         mediaUrl: row.media_url,
-        album_url: row.album_url
+        album_url: row.album_url,
+        lyrics: row.lyrics
       }
     }));
   }
@@ -144,7 +145,7 @@ class MusicHistory {
       SELECT 
         umh.history_id, umh.user_id, umh.song_id, 
         umh.play_count, umh.last_played, umh.is_favorite,
-        s.song_name, s.album, s.primary_artists, s.image_url, s.media_url,s.album_url
+        s.song_name, s.album, s.primary_artists, s.image_url, s.media_url,s.album_url,s.lyrics
       FROM 
         user_music_history umh
       JOIN 
@@ -168,7 +169,8 @@ class MusicHistory {
         artists: row.primary_artists,
         imageUrl: row.image_url,
         mediaUrl: row.media_url,
-        album_url: row.album_url
+        album_url: row.album_url,
+        lyrics: row.lyrics
       }
     }));
   }
@@ -343,7 +345,7 @@ class MusicHistory {
     const query = `
       SELECT 
         s.song_id, s.song_name, s.album, s.primary_artists, 
-        s.image_url, s.media_url,
+        s.image_url, s.media_url,s.album_url,s.lyrics,
         COUNT(*) as play_count
       FROM 
         user_music_history umh
@@ -367,7 +369,9 @@ class MusicHistory {
         album: row.album,
         artists: row.primary_artists,
         imageUrl: row.image_url,
-        mediaUrl: row.media_url
+        mediaUrl: row.media_url,
+        album_url: row.album_url,
+        lyrics:row.lyrics
       },
       playCount: parseInt(row.play_count)
     }));
