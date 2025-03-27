@@ -14,8 +14,11 @@ const createQueue = (name, options = {}) => {
     connection: {
     url: process.env.REDIS_URL
     },
+    
     defaultJobOptions: {
       attempts: 3,
+    
+      
       removeOnComplete: true,
       removeOnFail: 1000, // Keep last 1000 failed jobs
       backoff: {

@@ -11,7 +11,6 @@ const { authenticateToken } = require('../middleware/auth.middleware');
  */
 router.post(
   '/',
-  authenticateToken,
   [
     check('name', 'Playlist name is required').not().isEmpty(),
   ],
@@ -45,37 +44,39 @@ router.post(
   }
 );
 
-/**
- * @route   GET /api/playlists/:id
- * @desc    Get a playlist by ID
- * @access  Public
- */
-router.get('/:id', async (req, res) => {
-  try {
-    const playlist = await Playlist.getPlaylistById(req.params.id);
+// /**
+//  * @route   GET /api/playlists/:id
+//  * @desc    Get a playlist by ID
+//  * @access  Public
+//  */
+// router.get('playlist/:id', async (req, res) => {
+//   try {
+//     const playlist = await Playlist.getPlaylistById(req.params.id);
     
-    if (!playlist) {
-      return res.status(404).json({ error: 'Playlist not found' });
-    }
+//     if (!playlist) {
+//       return res.status(404).json({ error: 'Playlist not found' });
+//     }
     
-    res.json(playlist);
-  } catch (error) {
-    console.error('Get playlist error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+//     res.json(playlist);
+//   } catch (error) {
+//     console.error('Get playlist error:', error);
+//     res.status(500).json({ error: error.message });
+//   }
+// });
 
 /**
- * @route   GET /api/playlists/:id/songs
+ * @route   GET /api/playlists/get/
  * @desc    Get a playlist with detailed song information
  * @access  Public
  */
-router.get('/:id/songs', async (req, res) => {
+router.get('/get/:id', async (req, res) => {
   try {
     const playlist = await Playlist.getPlaylistWithSongs(req.params.id);
     
     if (!playlist) {
+      console.error('Playlist not found');
       return res.status(404).json({ error: 'Playlist not found' });
+
     }
     
     res.json(playlist);
@@ -90,9 +91,11 @@ router.get('/:id/songs', async (req, res) => {
  * @desc    Get all playlists created by a user
  * @access  Public
  */
-router.get('/user/:userId', async (req, res) => {
+router.get('/user/', async (req, res) => {
   try {
-    const playlists = await Playlist.getUserPlaylists(req.params.userId);
+    const userId = req.user.id;
+
+    const playlists = await Playlist.getUserPlaylists(userId);
     res.json(playlists);
   } catch (error) {
     console.error('Get user playlists error:', error);

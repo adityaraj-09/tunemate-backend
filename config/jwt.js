@@ -61,7 +61,7 @@ const generateRefreshToken = async (user) => {
     return token;
   } catch (error) {
     console.error('Error storing refresh token in Redis:', error);
-    // Return the token anyway so login still works
+  
     return token;
   }
 };

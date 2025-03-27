@@ -88,7 +88,7 @@ app.use('/api/songs', optionalAuth, songRoutes);
 app.use('/api/matches', authenticateToken, matchRoutes);
 app.use('/api/recommendations', authenticateToken, recommendationRoutes);
 app.use('/api/chats', authenticateToken, chatRoutes);
-app.use("/api/playlists",playlistRoutes)
+app.use("/api/playlists",authenticateToken,playlistRoutes)
 
 // Proxy to FastAPI Music Service
 app.use('/api/saavn', createProxyMiddleware({
@@ -204,5 +204,6 @@ if (process.env.RUN_WORKERS === 'true') {
   require('./workers/listen-events.worker');
   require('./workers/song-data.worker');
   require('./workers/match-calculation.worker');
+  // require('./workers/index');
 }
 
