@@ -343,27 +343,28 @@ class MusicHistory {
    */
   static async getTopSongsLastWeek() {
     const query = `
-      SELECT 
-        s.song_id, s.song_name, s.album, s.primary_artists, 
-        s.image_url, s.media_url,s.album_url,s.lyrics,
-        COUNT(*) as play_count
-      FROM 
-        user_music_history umh
-      JOIN 
-        songs s ON umh.song_id = s.song_id
-      WHERE 
-        umh.last_played >= NOW() - INTERVAL '7 days'
-      GROUP BY 
-        s.song_id, s.song_name, s.album, s.primary_artists, s.image_url, s.media_url
-      ORDER BY 
-        play_count DESC
-      LIMIT 20
+        SELECT 
+      s.song_id, s.song_name, s.album, s.primary_artists,
+      s.image_url, s.media_url, s.duration, s.release_year,
+      s.language, s.genre, s.album_url, s.lyrics,
+      SUM(umh.play_count) as total_plays
+    FROM 
+      user_music_history umh
+    JOIN 
+      songs s ON umh.song_id = s.song_id
+    WHERE 
+      umh.last_played >= NOW() - INTERVAL '7 days'
+    GROUP BY 
+      s.song_id
+    ORDER BY 
+      total_plays DESC
+    LIMIT 20;
     `;
     
     const result = await db.query(query);
     
     return result.rows.map(row => ({
-      song: {
+    
         id: row.song_id,
         name: row.song_name,
         album: row.album,
@@ -371,9 +372,14 @@ class MusicHistory {
         imageUrl: row.image_url,
         mediaUrl: row.media_url,
         album_url: row.album_url,
-        lyrics:row.lyrics
-      },
-      playCount: parseInt(row.play_count)
+        lyrics:row.lyrics,
+        duration: row.duration,
+        release_year: row.release_year,
+        language: row.language,
+        genre
+        : row.genre,
+      
+      playCount: parseInt(row.total_plays)
     }));
   }
 }

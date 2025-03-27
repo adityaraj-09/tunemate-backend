@@ -232,7 +232,7 @@ router.get('/trending', async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     
     // First try our database
-    const songs = await Song.getPopular(limit);
+    const songs = await MusicHistory.getTopSongsLastWeek();
     
     // If we have enough songs, return them
     if (songs.length >0) {
