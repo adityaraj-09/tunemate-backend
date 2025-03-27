@@ -129,7 +129,7 @@ class Playlist {
     
     return this.formatPlaylistWithCreator({
       ...playlistData,
-      songs,
+      songs: songs,
       song_count: songs.length
     });
   }
