@@ -210,6 +210,9 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation
 CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 -- -- Index for the date filter with song_id for covered queries
 -- CREATE INDEX idx_user_music_history_last_played_song_id ON user_music_history(last_played, song_id);
 

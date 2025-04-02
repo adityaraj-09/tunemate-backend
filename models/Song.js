@@ -289,26 +289,25 @@ LIMIT $2
       SELECT 
         song_id, song_name, album, primary_artists, singers, 
         image_url, media_url, duration, release_year, 
-        language, genre,album_url,lyrics
+        language, genre, album_url, lyrics,
+        similarity(song_name, $1) AS song_similarity,
+        similarity(primary_artists, $1) AS artist_similarity,
+        similarity(album, $1) AS album_similarity
       FROM songs
       WHERE 
-        song_name ILIKE $1 OR
-        album ILIKE $1 OR
-        primary_artists ILIKE $1
+        song_name % $1 OR
+        album % $1 OR
+        primary_artists % $1
       ORDER BY
-        CASE 
-          WHEN song_name ILIKE $1 THEN 1
-          WHEN primary_artists ILIKE $1 THEN 2
-          WHEN album ILIKE $1 THEN 3
-          ELSE 4
-        END
+        GREATEST(similarity(song_name, $1), similarity(primary_artists, $1), similarity(album, $1)) DESC
       LIMIT $2
     `;
 
-    const result = await db.query(searchQuery, [`%${query}%`, limit]);
+    const result = await db.query(searchQuery, [query, limit]);
 
     return result.rows.map(row => this.formatSong(row));
-  }
+}
+
 
   /**
    * Get songs by genre
