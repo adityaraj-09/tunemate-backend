@@ -171,7 +171,7 @@ router.get('/search', async (req, res) => {
       console.log('Saavn API response:', response.data);
       if (response.data) {
         // Process and store the songs in the background
-        for (const song of response.data) {
+        for (const song of response.data.songs) {
           // Queue song data processing
           await songDataQueue.add(
             'process-song',
@@ -187,7 +187,7 @@ router.get('/search', async (req, res) => {
           );
         }
         
-        return res.json({ songs: response.data,success:true });
+        return res.json({...(response.data),success:true });
       }
     } catch (error) {
       console.error('Error searching via Saavn API:', error);
