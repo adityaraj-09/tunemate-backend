@@ -155,14 +155,7 @@ router.get('/search', async (req, res) => {
       return res.status(400).json({ error: 'Search query is required' });
     }
     
-    // Search for songs in our database
-    const songs = await Song.search(query, limit);
-    
-    console.log('Database search results:', songs.length);
-    // If we have enough results, return them
-    if (songs.length >= Math.floor(limit / 2)) {
-      return res.json({ songs,success:true });
-    }
+  
     
     // Otherwise, try to search via Saavn API
     try {
@@ -193,7 +186,14 @@ router.get('/search', async (req, res) => {
       console.error('Error searching via Saavn API:', error);
       // Continue with our database results if Saavn API fails
     }
+      // Search for songs in our database
+      const songs = await Song.search(query, limit);
     
+      console.log('Database search results:', songs.length);
+      // If we have enough results, return them
+      if (songs.length >= Math.floor(limit / 2)) {
+        return res.json({ songs,success:true });
+      }
     // Return whatever results we have from our database
     res.json({ songs,success:true });
   } catch (error) {

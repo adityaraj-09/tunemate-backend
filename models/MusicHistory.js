@@ -194,7 +194,26 @@ class MusicHistory {
     const result = await db.query(query, [userId, songId]);
     return result.rows[0].exists;
   }
-  
+  /**
+   * Check if a user is new based on their history length
+   * 
+   * @param {string} userId - User ID
+   * @returns {Promise<boolean>} True if user is new (has less than 10 history entries)
+   */
+  static async isNewUser(userId) {
+    const query = `
+      SELECT COUNT(*) as history_count
+      FROM user_music_history
+      WHERE user_id = $1
+    `;
+    
+    const result = await db.query(query, [userId]);
+    const historyCount = parseInt(result.rows[0].history_count);
+    
+    return historyCount < 10;
+  }
+
+
   /**
    * Get common songs between two users
    * 

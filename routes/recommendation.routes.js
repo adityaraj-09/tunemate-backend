@@ -42,11 +42,11 @@ router.get('/songs', async (req, res) => {
       recommendations = await getNewUserRecommendations(req.user.id, genres, limit);
     } else {
       // For users with history, get collaborative and content-based recommendations
-      const collaborativeRecs = await getCollaborativeSongRecommendations(req.user.id, Math.floor(limit / 2));
+      // const collaborativeRecs = await getCollaborativeSongRecommendations(req.user.id, Math.floor(limit / 2));
       const contentRecs = await getContentBasedSongRecommendations(req.user.id, Math.floor(limit / 2));
       
       // Combine and deduplicate recommendations
-      const combinedRecs = [...collaborativeRecs, ...contentRecs];
+      const combinedRecs = [ ...contentRecs];
       const uniqueRecs = [];
       const songIds = new Set();
       
@@ -66,12 +66,12 @@ router.get('/songs', async (req, res) => {
       // If we still don't have enough recommendations, add popular songs
       if (recommendations.length < limit) {
         // Get songs user has already heard
-        const userSongs = await MusicHistory.getUserSongIds(req.user.id);
-        
+        const userSongs = await MusicHistory.getUserHistory(req.user.id);
+        const userSongIds = userSongs.map(song => song.songId);
         // Get popular songs excluding ones user has already heard
         const popularSongs = await Song.getPopular(
           limit - recommendations.length,
-          [...userSongs, ...recommendations.map(rec => rec.id)]
+          [...userSongIds, ...recommendations.map(rec => rec.id)]
         );
         
         recommendations = [...recommendations, ...popularSongs];
