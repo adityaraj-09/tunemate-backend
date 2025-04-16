@@ -27,6 +27,7 @@ const matchRoutes = require('./routes/match.routes');
 const recommendationRoutes = require('./routes/recommendation.routes');
 const chatRoutes = require('./routes/chat.routes');
 const playlistRoutes=require("./routes/playlist.routes")
+const locationRoutes=require("./routes/location.routes")
 
 
 // Create Express app
@@ -85,6 +86,7 @@ app.get("/",(req,res)=>{
 app.use('/api/auth', authRoutes);
 app.use('/api/users', authenticateToken, userRoutes);
 app.use('/api/songs', optionalAuth, songRoutes);
+app.use("/api/location",authenticateToken,locationRoutes)
 app.use('/api/matches', authenticateToken, matchRoutes);
 app.use('/api/recommendations', authenticateToken, recommendationRoutes);
 app.use('/api/chats', authenticateToken, chatRoutes);

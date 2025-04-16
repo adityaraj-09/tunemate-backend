@@ -292,6 +292,8 @@ class UserLocation {
     
     return distance;
   }
+
+  
 }
 
 module.exports = UserLocation;
