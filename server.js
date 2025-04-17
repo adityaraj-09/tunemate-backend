@@ -28,7 +28,7 @@ const recommendationRoutes = require('./routes/recommendation.routes');
 const chatRoutes = require('./routes/chat.routes');
 const playlistRoutes=require("./routes/playlist.routes")
 const locationRoutes=require("./routes/location.routes")
-
+const prefsRoutes=require("./routes/prefs.routes")
 
 // Create Express app
 const app = express();
@@ -91,6 +91,7 @@ app.use('/api/matches', authenticateToken, matchRoutes);
 app.use('/api/recommendations', authenticateToken, recommendationRoutes);
 app.use('/api/chats', authenticateToken, chatRoutes);
 app.use("/api/playlists",authenticateToken,playlistRoutes)
+app.use("/api/preferences",authenticateToken,prefsRoutes)
 
 // Proxy to FastAPI Music Service
 app.use('/api/saavn', createProxyMiddleware({
