@@ -18,6 +18,8 @@ class Match {
    * @returns {Promise<Array<Object>>} Potential matches with details
    */
   static async getPotentialMatches(userId, { minScore = 60, limit = 20 } = {}) {
+
+    console.log('Fetching potential matches for user:', userId);
     // First, get user's preferences and location
     const userPrefsQuery = `
       SELECT 
@@ -33,6 +35,7 @@ class Match {
     
     const userPrefsResult = await db.query(userPrefsQuery, [userId]);
     
+    console.log('User preferences result:', userPrefsResult.rows);
     if (userPrefsResult.rows.length === 0 || !userPrefsResult.rows[0].latitude) {
       throw new Error('User preferences or location not found');
     }
@@ -41,38 +44,30 @@ class Match {
     
     // Find users based on preferences and location
     const potentialMatchesQuery = `
-      WITH potential_users AS (
-        SELECT 
-          u.user_id,
-          EXTRACT(YEAR FROM AGE(CURRENT_DATE, u.birth_date)) as age,
-          (
-            6371 * acos(
-              cos(radians($1)) * 
-              cos(radians(ul.latitude)) * 
-              cos(radians(ul.longitude) - radians($2)) + 
-              sin(radians($1)) * 
-              sin(radians(ul.latitude))
-            )
-          ) as distance
-        FROM users u
-        JOIN user_locations ul ON u.user_id = ul.user_id
-        JOIN user_preferences up ON u.user_id = up.user_id
-        WHERE u.user_id != $3
-          AND up.is_visible = TRUE
-          AND ($4::VARCHAR IS NULL OR u.gender = $4)
-          AND EXTRACT(YEAR FROM AGE(CURRENT_DATE, u.birth_date)) BETWEEN $5 AND $6
-          AND (
-            6371 * acos(
-              cos(radians($1)) * 
-              cos(radians(ul.latitude)) * 
-              cos(radians(ul.longitude) - radians($2)) + 
-              sin(radians($1)) * 
-              sin(radians(ul.latitude))
-            )
-          ) <= $7
+    WITH potential_users AS (
+  SELECT 
+    u.user_id,
+    EXTRACT(YEAR FROM AGE(CURRENT_DATE, u.birth_date)) as age,
+    (
+      6371 * acos(
+        cos(radians($1)) * 
+        cos(radians(ul.latitude)) * 
+        cos(radians(ul.longitude) - radians($2)) + 
+        sin(radians($1)) * 
+        sin(radians(ul.latitude))
       )
-      SELECT user_id, distance
-      FROM potential_users
+    )::decimal(10,2) as distance
+  FROM users u
+  JOIN user_locations ul ON u.user_id = ul.user_id
+  JOIN user_preferences up ON u.user_id = up.user_id
+  WHERE u.user_id != $3
+    AND up.is_visible = TRUE
+    AND ($4::VARCHAR IS NULL OR u.gender = $4)
+    AND EXTRACT(YEAR FROM AGE(CURRENT_DATE, u.birth_date)) BETWEEN $5 AND $6
+) 
+SELECT user_id, distance
+FROM potential_users
+WHERE distance <= $7;
     `;
     
     const potentialMatches = await db.query(potentialMatchesQuery, [
@@ -85,6 +80,7 @@ class Match {
       userPrefs.max_distance || 100
     ]);
     
+    console.log('Potential matches:', potentialMatches.rows);
     // Calculate music compatibility for each potential match
     const matchResults = [];
     

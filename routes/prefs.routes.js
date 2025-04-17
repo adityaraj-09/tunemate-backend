@@ -56,11 +56,11 @@ router.post('/',
       });
       
       // Publish event for real-time updates
-      publish(CHANNELS.USER_UPDATED, { 
-        userId: req.user.id, 
-        type: 'preferences_updated',
-        data: preferences
-      });
+      // publish(CHANNELS.USER_UPDATED, { 
+      //   userId: req.user.id, 
+      //   type: 'preferences_updated',
+      //   data: preferences
+      // });
       
       res.json({
         message: 'Preferences updated successfully',
@@ -103,12 +103,12 @@ router.put('/',
       // Update preferences
       const preferences = await UserPreference.update(req.user.id, req.body);
       
-      // Publish event for real-time updates
-      publish(CHANNELS.USER_UPDATED, { 
-        userId: req.user.id, 
-        type: 'preferences_updated',
-        data: preferences
-      });
+      // // Publish event for real-time updates
+      // publish(CHANNELS.USER_UPDATED, { 
+      //   userId: req.user.id, 
+      //   type: 'preferences_updated',
+      //   data: preferences
+      // });
       
       res.json({
         message: 'Preferences updated successfully',
@@ -149,11 +149,11 @@ router.delete('/', async (req, res) => {
     });
     
     // Publish event for real-time updates
-    publish(CHANNELS.USER_UPDATED, { 
-      userId: req.user.id, 
-      type: 'preferences_reset',
-      data: defaultPreferences
-    });
+    // publish(CHANNELS.USER_UPDATED, { 
+    //   userId: req.user.id, 
+    //   type: 'preferences_reset',
+    //   data: defaultPreferences
+    // });
     
     res.json({
       message: 'Preferences reset to defaults',

@@ -13,7 +13,7 @@ const { publish, CHANNELS } = require('../config/redis');
  * @desc    Get potential matches for user
  * @access  Private
  */
-router.get('/', async (req, res) => {
+router.get('/get', async (req, res) => {
   try {
     const minScore = parseInt(req.query.minScore) || 60;
     const limit = parseInt(req.query.limit) || 20;
