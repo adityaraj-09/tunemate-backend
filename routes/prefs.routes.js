@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { check, validationResult } = require('express-validator');
 const UserPreference = require('../models/UserPreference');
-const auth = require('../middleware/auth');
+
 const { publish, CHANNELS } = require('../config/redis');
 
 /**
@@ -11,7 +11,7 @@ const { publish, CHANNELS } = require('../config/redis');
  * @desc    Get user's preferences
  * @access  Private
  */
-router.get('/', auth, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const preferences = await UserPreference.findByUserId(req.user.id);
     
@@ -29,7 +29,7 @@ router.get('/', auth, async (req, res) => {
  */
 router.post('/', 
   [
-    auth,
+  
     check('preferredGender', 'Preferred gender must be valid').optional(),
     check('minAge', 'Minimum age must be at least 18').optional().isInt({ min: 18 }),
     check('maxAge', 'Maximum age must be at most 100').optional().isInt({ max: 100 }),
@@ -80,7 +80,7 @@ router.post('/',
  */
 router.put('/', 
   [
-    auth,
+  
     check('preferredGender', 'Preferred gender must be valid').optional(),
     check('minAge', 'Minimum age must be at least 18').optional().isInt({ min: 18 }),
     check('maxAge', 'Maximum age must be at most 100').optional().isInt({ max: 100 }),
@@ -131,7 +131,7 @@ router.put('/',
  * @desc    Reset user preferences to defaults
  * @access  Private
  */
-router.delete('/', auth, async (req, res) => {
+router.delete('/', async (req, res) => {
   try {
     const deleted = await UserPreference.delete(req.user.id);
     
@@ -170,7 +170,7 @@ router.delete('/', auth, async (req, res) => {
  * @desc    Get recommended preference settings based on user's music taste
  * @access  Private
  */
-router.get('/recommendations', auth, async (req, res) => {
+router.get('/recommendations', async (req, res) => {
   try {
     // Get user's music history
     const musicHistory = await MusicHistory.getUserHistory(req.user.id, { limit: 100 });
@@ -252,7 +252,7 @@ router.get('/recommendations', auth, async (req, res) => {
  */
 router.get('/compatibility/:userId', 
   [
-    auth,
+
     check('userId', 'Valid user ID is required').isUUID()
   ],
   async (req, res) => {
